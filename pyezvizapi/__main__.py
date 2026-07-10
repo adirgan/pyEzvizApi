@@ -639,10 +639,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser_save_clip.add_argument("--serial", required=True, help="camera SERIAL")
     parser_save_clip.add_argument(
         "--source",
-        choices=("local-sdk", "cloud", "hcnetsdk-command-port"),
+        choices=("local-sdk", "cloud", "cloud-playback", "hcnetsdk-command-port"),
         default="local-sdk",
         help=(
-            "Source to use: direct 9010/9020 SDK, VTM cloud live stream, or "
+            "Source to use: direct 9010/9020 SDK, VTM cloud live stream, "
+            "VTM cloud SD-card playback, or "
             "full HCNetSDK command-port media on port 8000 (default: local-sdk)"
         ),
     )
@@ -660,14 +661,31 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser_save_clip.add_argument(
         "--duration",
         type=_parse_duration_seconds,
-        default=10.0,
-        help="Capture duration; accepts seconds or units like 10s/1m (default: 10s)",
+        default=None,
+        help=(
+            "Capture duration; accepts seconds or units like 10s/1m. Defaults to "
+            "10s except cloud-playback, which saves the requested range."
+        ),
     )
     parser_save_clip.add_argument(
         "--max-packets",
         type=int,
         default=None,
         help="Optional packet limit in addition to --duration",
+    )
+    parser_save_clip.add_argument(
+        "--begin-time",
+        help=(
+            "Playback start time for --source cloud-playback, for example "
+            "20260709T222458Z"
+        ),
+    )
+    parser_save_clip.add_argument(
+        "--end-time",
+        help=(
+            "Playback end time for --source cloud-playback, for example "
+            "20260709T222531Z"
+        ),
     )
     parser_save_clip.add_argument(
         "--format",
@@ -894,12 +912,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--token-index",
         type=int,
         default=0,
-        help="VTDU token index for --source cloud (default: 0)",
+        help="VTDU token index for --source cloud/cloud-playback (default: 0)",
     )
     parser_save_clip.add_argument(
         "--no-refresh-vtm",
         action="store_true",
-        help="Use pagelist VTM metadata without refreshing it for --source cloud",
+        help="Use pagelist VTM metadata without refreshing it for cloud sources",
+    )
+    parser_save_clip.add_argument(
+        "--lid",
+        help="Optional EZVIZ playback lid parameter for --source cloud-playback",
     )
 
     parser_save_image = subparsers_save.add_parser(
@@ -2251,7 +2273,7 @@ def _handle_save_clip(args: argparse.Namespace, client: EzvizClient) -> int:
     save_kwargs: dict[str, Any] = {
         "source": args.source,
         "output_format": args.format,
-        "duration_seconds": args.duration,
+        "duration_seconds": args.duration if args.duration is not None else 10.0,
         "max_packets": args.max_packets,
         "channel": args.channel,
         "ffmpeg_path": args.ffmpeg_path,
@@ -2290,12 +2312,26 @@ def _handle_save_clip(args: argparse.Namespace, client: EzvizClient) -> int:
     }
     if args.source == "local-sdk":
         save_kwargs["register_p2p_session"] = not args.no_p2p_register
-    if args.source == "cloud":
+    if args.source in {"cloud", "cloud-playback"}:
         save_kwargs.update(
             {
                 "cloud_client_type": args.client_type,
                 "cloud_token_index": args.token_index,
                 "cloud_refresh_vtm": not args.no_refresh_vtm,
+            }
+        )
+    if args.source == "cloud-playback":
+        if not args.begin_time or not args.end_time:
+            raise PyEzvizError("--source cloud-playback requires --begin-time and --end-time")
+        if args.format != "mpegps":
+            raise PyEzvizError("--source cloud-playback requires --format mpegps")
+        if args.duration is None:
+            save_kwargs["duration_seconds"] = None
+        save_kwargs.update(
+            {
+                "cloud_playback_begin_time": args.begin_time,
+                "cloud_playback_end_time": args.end_time,
+                "cloud_playback_lid": args.lid,
             }
         )
     if args.decrypt_video and (
