@@ -370,7 +370,9 @@ class VtmStreamClient:
                     yield packet
                 continue
 
-            if packet.channel in (VtmChannel.STREAM, VtmChannel.ENCRYPTED_STREAM):
+            if packet.channel == VtmChannel.ENCRYPTED_STREAM or detect_transport(
+                packet.body
+            ) != StreamTransport.UNKNOWN:
                 seen += 1
                 yield packet
                 continue
@@ -503,12 +505,8 @@ def decode_vtm_header(header: bytes) -> VtmPacket:
     if header[0] != VTM_MAGIC:
         raise PyEzvizError("VTM magic byte not found")
 
-    channel = header[1]
-    if channel not in {int(item) for item in VtmChannel}:
-        raise PyEzvizError(f"Unknown VTM channel: 0x{channel:02x}")
-
     return VtmPacket(
-        channel=channel,
+        channel=header[1],
         length=int.from_bytes(header[2:4], "big"),
         sequence=int.from_bytes(header[4:6], "big"),
         message_code=int.from_bytes(header[6:8], "big"),
@@ -536,9 +534,7 @@ def decode_vtm_packet(packet: bytes) -> VtmPacket:
 def summarize_vtm_packet(packet: VtmPacket, *, index: int = 0) -> VtmTraceEvent:
     """Build a body-free packet summary for debugging live VTM streams."""
 
-    transport = StreamTransport.UNKNOWN
-    if packet.channel == VtmChannel.STREAM:
-        transport = detect_transport(packet.body)
+    transport = detect_transport(packet.body)
 
     return VtmTraceEvent(
         index=index,
