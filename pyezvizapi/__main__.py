@@ -714,8 +714,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "h264-encrypted-header",
             "encrypted-header",
         ),
-        default="encrypted-header",
-        help="Video codec transform for --decrypt-video (default: encrypted-header)",
+        default=None,
+        help=(
+            "Video codec transform for --decrypt-video. Defaults to auto for "
+            "cloud-playback and encrypted-header otherwise."
+        ),
     )
     parser_save_clip.add_argument(
         "--media-key",
@@ -2253,6 +2256,9 @@ def _handle_save_clip(args: argparse.Namespace, client: EzvizClient) -> int:
         if command_frames is not None
         else True
     )
+    decrypt_codec = args.decrypt_codec or (
+        "auto" if args.source == "cloud-playback" else "encrypted-header"
+    )
     hcnetsdk_command_metadata_callback = (
         (
             lambda stream: _write_local_sdk_metadata_output(
@@ -2278,7 +2284,7 @@ def _handle_save_clip(args: argparse.Namespace, client: EzvizClient) -> int:
         "channel": args.channel,
         "ffmpeg_path": args.ffmpeg_path,
         "decrypt_video": args.decrypt_video,
-        "nalu_header_size": _codec_nalu_header_size(args.decrypt_codec),
+        "nalu_header_size": _codec_nalu_header_size(decrypt_codec),
         "cas_serial": args.cas_serial,
         "timeout": args.timeout,
         "smscode": args.sms_code,

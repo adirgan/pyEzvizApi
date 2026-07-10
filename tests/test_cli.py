@@ -1841,7 +1841,7 @@ def test_save_clip_can_use_cloud_playback_source(
         "channel": 2,
         "ffmpeg_path": "ffmpeg",
         "decrypt_video": True,
-        "nalu_header_size": 0,
+        "nalu_header_size": None,
         "cas_serial": None,
         "timeout": HCNETSDK_DEFAULT_SAVE_TIMEOUT,
         "smscode": "654321",
@@ -1885,6 +1885,43 @@ def test_save_clip_can_use_cloud_playback_source(
         "begin_time": "20260709T222458Z",
         "end_time": "20260709T222531Z",
     }
+
+
+def test_save_clip_cloud_playback_decrypt_codec_override(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    fake_client = _install_fake_client(monkeypatch)
+    output_path = tmp_path / "www" / "front.ps"
+
+    assert (
+        cli_module.main(
+            [
+                "--token-file",
+                _token_file(tmp_path),
+                "save",
+                "clip",
+                "--source",
+                "cloud-playback",
+                "--serial",
+                "CAM123",
+                "--begin-time",
+                "20260709T222458Z",
+                "--end-time",
+                "20260709T222531Z",
+                "--format",
+                "mpegps",
+                "--output",
+                str(output_path),
+                "--decrypt-video",
+                "--decrypt-codec",
+                "hevc",
+            ]
+        )
+        == 0
+    )
+
+    assert fake_client.instances[0].save_clip_request["nalu_header_size"] == 2
 
 
 def test_save_image_triggers_capture_and_downloads_url(
