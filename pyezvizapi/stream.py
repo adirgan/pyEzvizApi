@@ -63,6 +63,7 @@ class VtmChannel(IntEnum):
 
     MESSAGE = 0x00
     STREAM = 0x01
+    STREAM_ALT = 0x02
     ENCRYPTED_MESSAGE = 0x0A
     ENCRYPTED_STREAM = 0x0B
 
@@ -370,9 +371,11 @@ class VtmStreamClient:
                     yield packet
                 continue
 
-            if packet.channel == VtmChannel.ENCRYPTED_STREAM or detect_transport(
-                packet.body
-            ) != StreamTransport.UNKNOWN:
+            if packet.channel in (
+                VtmChannel.STREAM,
+                VtmChannel.STREAM_ALT,
+                VtmChannel.ENCRYPTED_STREAM,
+            ):
                 seen += 1
                 yield packet
                 continue
