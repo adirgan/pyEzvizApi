@@ -166,6 +166,7 @@ _LOGGER = logging.getLogger(__name__)
 
 UNIFIEDMSG_LOOKBACK_DAYS = 7
 MAX_UNIFIEDMSG_PAGES = 6
+DEFAULT_CLIP_DURATION_SECONDS = 10.0
 
 JsonDict = dict[str, Any]
 ClipSource = Literal["local-sdk", "hcnetsdk-command-port", "cloud", "cloud-playback"]
@@ -2989,7 +2990,7 @@ class EzvizClient:
         *,
         source: ClipSource = "local-sdk",
         output_format: ClipOutputFormat = "mpegts",
-        duration_seconds: float | None = 10.0,
+        duration_seconds: float | None = DEFAULT_CLIP_DURATION_SECONDS,
         max_packets: int | None = None,
         channel: int = 1,
         ffmpeg_path: str = "ffmpeg",
@@ -3144,7 +3145,12 @@ class EzvizClient:
                 end_time=cloud_playback_end_time,
                 output_format=output_format,
                 max_packets=max_packets,
-                duration_seconds=duration_seconds,
+                duration_seconds=(
+                    None
+                    if duration_seconds == DEFAULT_CLIP_DURATION_SECONDS
+                    and max_packets is None
+                    else duration_seconds
+                ),
                 channel=channel,
                 decrypt_video=decrypt_video,
                 media_key=media_key,

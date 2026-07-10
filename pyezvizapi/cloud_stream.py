@@ -393,7 +393,7 @@ def copy_cloud_playback_to_mpegps(  # noqa: PLR0913
         lid=lid,
     ) as stream:
         stream.start()
-        _write_cloud_stream_payloads(
+        _write_cloud_playback_payloads(
             stream,
             output,
             max_packets=max_packets,
@@ -598,6 +598,33 @@ def _write_cloud_stream_payloads(
     output.flush()
 
 
+def _write_cloud_playback_payloads(
+    stream: Any,
+    output: BinaryIO,
+    *,
+    max_packets: int | None,
+    duration_seconds: float | None = None,
+    monotonic: Callable[[], float] = time.monotonic,
+) -> None:
+    wrote_payload = False
+    deadline = None if duration_seconds is None else monotonic() + duration_seconds
+    try:
+        for packet in stream.iter_packets(max_packets=max_packets):
+            if deadline is not None and monotonic() >= deadline:
+                break
+            if packet.encrypted:
+                raise PyEzvizError(
+                    "Received encrypted VTM stream packet; media decryption is not implemented"
+                )
+            if packet.body:
+                output.write(packet.body)
+                wrote_payload = True
+    except DeviceException:
+        if not wrote_payload:
+            raise
+    output.flush()
+
+
 def _collect_cloud_stream_payloads(
     stream: Any,
     *,
@@ -618,7 +645,7 @@ def _collect_cloud_stream_payloads(
                     "Received encrypted VTM stream packet; media decryption is not implemented"
                 )
             chunks.append(packet.body)
-    except (DeviceException, PyEzvizError):
+    except DeviceException:
         if not chunks:
             raise
     return b"".join(chunks)
