@@ -135,8 +135,10 @@ tooling under `tools/apk-re`. Use `--source cloud-playback` to save an SD-card
 recording range through the authenticated EZVIZ VTM cloud playback path. This
 source requires `--begin-time`, `--end-time`, and `--format mpegps`; when
 `--duration` is omitted it saves the requested playback range. Add
-`--decrypt-video` for cameras that encrypt the MPEG-PS video payloads. `save image`
-triggers the camera capture endpoint unless `--image-url` is supplied,
+`--decrypt-video` for cameras that encrypt the MPEG-PS video payloads. For
+cloud playback, encrypted video uses automatic NAL-header detection by default;
+pass `--decrypt-codec` only for manual codec experiments. `save image` triggers
+the camera capture endpoint unless `--image-url` is supplied,
 then downloads and decrypts EZVIZ encrypted image payloads when needed.
 
 Integrations can use the same behavior directly from `client.py` without
@@ -619,6 +621,9 @@ pyezvizapi --token-file ezviz_token.json --json save clip \
   --source cloud-playback --serial ABC123 --channel 1 \
   --begin-time 20260510T215000Z --end-time 20260510T215010Z \
   --format mpegps --output clip.ps
+
+# Optional: remux the MPEG-PS output to MP4 without transcoding
+ffmpeg -f mpeg -i clip.ps -map 0 -c copy -movflags +faststart clip.mp4
 ```
 
 SD-card records are descriptors for native playback/download. The public API does
